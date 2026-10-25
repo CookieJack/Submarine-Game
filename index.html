@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深海布雷 — 逆向炸潜艇</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <div id="frame">
+    <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+    <div id="ui-root">
+      <!-- ================= HUD ================= -->
+      <div id="hud" class="hidden">
+        <div class="hud-block hud-left">
+          <div class="hud-label">HULL INTEGRITY</div>
+          <div id="lives" class="hull-row"></div>
+        </div>
+
+        <div class="hud-block hud-center">
+          <div id="level-name">第 1 关 · 近海巡逻</div>
+          <div class="hud-meta">
+            <span id="progress">过境 0/3</span>
+            <span class="dot"></span>
+            <span id="sunk">击沉 0</span>
+          </div>
+        </div>
+
+        <div class="hud-block hud-right">
+          <div class="score-line"><span>SCORE</span><b id="score">0</b></div>
+          <div class="score-line best"><span>BEST</span><b id="best">0</b></div>
+          <div class="hud-buttons">
+            <button id="btn-pause" class="hud-btn">暂停</button>
+            <button id="btn-mute" class="hud-btn">声音：开</button>
+          </div>
+        </div>
+
+        <div class="ammo-block">
+          <div class="ammo-top">
+            <span class="hud-label">MINE RACK</span>
+            <span id="ammo-count">5 / 5</span>
+          </div>
+          <div id="ammo-slots" class="ammo-slots"></div>
+          <div class="reload-track"><div id="reload-fill"></div></div>
+          <div class="ammo-hint">左键布雷 · 海面待爆 2 秒</div>
+        </div>
+
+        <div id="hint-bar">鼠标潜航 · 左键布雷 · P 暂停 · M 静音</div>
+      </div>
+
+      <!-- ================= 关卡横幅 ================= -->
+      <div id="banner" class="hidden">
+        <div class="banner-kicker">OPERATION</div>
+        <div id="banner-title"></div>
+        <div id="banner-sub"></div>
+      </div>
+
+      <!-- ================= 开始界面 ================= -->
+      <div id="screen-menu" class="screen">
+        <div class="screen-card menu-card">
+          <div class="kicker">REVERSE DEPTH CHARGE</div>
+          <h1 class="game-title">深海布雷</h1>
+          <div class="subtitle">逆向《炸潜艇》 · 猎杀过境舰队</div>
+
+          <div class="howto">
+            <div class="howto-item">
+              <div class="howto-num">01</div>
+              <h3>潜航</h3>
+              <p>鼠标操控潜艇在深海自由移动，避开驱逐舰投下的深水炸弹。</p>
+            </div>
+            <div class="howto-item">
+              <div class="howto-num">02</div>
+              <h3>布雷</h3>
+              <p>左键把水雷送上水面。水雷在海面待爆 2 秒，舰体触碰即爆炸。</p>
+            </div>
+            <div class="howto-item">
+              <div class="howto-num">03</div>
+              <h3>生存</h3>
+              <p>3 条命，5 个海区。顶住全部过境舰队即可完成任务。</p>
+            </div>
+          </div>
+
+          <div class="menu-stats">
+            <span>最高分 <b id="menu-best">0</b></span>
+            <span class="dot"></span>
+            <span>5 个海区</span>
+            <span class="dot"></span>
+            <span>M 静音</span>
+          </div>
+
+          <button id="btn-start" class="primary-btn">开始任务</button>
+          <div class="menu-foot">鼠标潜航 · 左键布雷 · P 暂停</div>
+        </div>
+      </div>
+
+      <!-- ================= 关卡结算 ================= -->
+      <div id="screen-levelclear" class="screen hidden">
+        <div class="screen-card small">
+          <div class="kicker">SECTOR CLEAR</div>
+          <h2>航线肃清</h2>
+          <div id="lc-level" class="screen-sub">第 1 关 · 近海巡逻</div>
+
+          <div class="stat-grid">
+            <div class="stat-cell"><span>本关得分</span><b id="lc-score">+0</b></div>
+            <div class="stat-cell"><span>击沉</span><b id="lc-sunk">0</b></div>
+            <div class="stat-cell"><span>通过</span><b id="lc-passed">0</b></div>
+          </div>
+
+          <div id="lc-life" class="supply">船体维修 +1 · 当前生命 3/3</div>
+
+          <button id="btn-next" class="primary-btn">进入下一海区</button>
+          <div class="menu-foot">Enter / 空格 继续</div>
+        </div>
+      </div>
+
+      <!-- ================= 失败 ================= -->
+      <div id="screen-gameover" class="screen hidden">
+        <div class="screen-card small">
+          <div class="kicker danger-text">SIGNAL LOST</div>
+          <h2 class="danger-text">潜艇沉没</h2>
+          <div class="screen-sub">信号消失在深海中</div>
+
+          <div class="stat-grid">
+            <div class="stat-cell"><span>最终得分</span><b id="go-score">0</b></div>
+            <div class="stat-cell"><span>到达海区</span><b id="go-level">第 1 关</b></div>
+            <div class="stat-cell"><span>累计击沉</span><b id="go-sunk">0</b></div>
+          </div>
+
+          <button id="btn-restart" class="primary-btn">再次下潜</button>
+          <div class="menu-foot">Enter / 空格 重新开始</div>
+        </div>
+      </div>
+
+      <!-- ================= 胜利 ================= -->
+      <div id="screen-victory" class="screen hidden">
+        <div class="screen-card small">
+          <div class="kicker">ALL SECTORS CLEAR</div>
+          <h2>任务完成</h2>
+          <div class="screen-sub">五片海区的封锁任务全部完成，你活着回来了。</div>
+
+          <div class="stat-grid">
+            <div class="stat-cell"><span>总分</span><b id="vc-score">0</b></div>
+            <div class="stat-cell"><span>最高分</span><b id="vc-best">0</b></div>
+            <div class="stat-cell"><span>累计击沉</span><b id="vc-sunk">0</b></div>
+          </div>
+
+          <button id="btn-restart-victory" class="primary-btn">再来一次</button>
+          <div class="menu-foot">Enter / 空格 重新开始</div>
+        </div>
+      </div>
+
+      <!-- ================= 暂停 ================= -->
+      <div id="screen-pause" class="screen hidden">
+        <div class="screen-card small">
+          <div class="kicker">SYSTEM HOLD</div>
+          <h2>已暂停</h2>
+          <div class="screen-sub">深海静默中</div>
+
+          <div class="btn-row">
+            <button id="btn-resume" class="primary-btn">继续任务</button>
+            <button id="btn-restart-pause" class="ghost-btn">重新开始</button>
+            <button id="btn-mute-pause" class="ghost-btn">声音：开</button>
+          </div>
+          <div class="menu-foot">P / Esc 继续</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
