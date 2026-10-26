@@ -18,12 +18,14 @@ const Game = {
   lives: CFG.PLAYER.LIVES,
   totalSunk: 0,
 
-  mines: CFG.MINE.MAGAZINE,
+  selectedType: 'diesel',
+  ammo: CFG.MINE.MAGAZINE,
   reloadTimer: 0,
   fireCd: 0,
 
   sub: null,
   minesArr: [],
+  missiles: [],
   destroyers: [],
   charges: [],
 
@@ -52,13 +54,60 @@ const Game = {
     World.init();
     FX.reset();
     this.best = this.loadBest();
-    this.sub = new Submarine(CFG.PLAYER.START_X, CFG.PLAYER.START_Y);
+    this.sub = new Submarine(CFG.PLAYER.START_X, CFG.PLAYER.START_Y, this.selectedType);
 
     Input.init(this.canvas, this);
     UI.init(this);
     UI.updateScore(0, this.best);
 
     requestAnimationFrame((ts) => this.loop(ts));
+  },
+
+  weaponCfg() {
+    return this.sub && this.sub.spec.weapon === 'missile' ? CFG.MISSILE : CFG.MINE;
+  },
+
+  selectSub(type) {
+    if (this.state !== 'menu' || !CFG.SUBMARINES[type]) return;
+    this.selectedType = type;
+    this.sub = new Submarine(CFG.PLAYER.START_X, CFG.PLAYER.START_Y, type);
+    Input.mx = this.sub.x;
+    Input.my = this.sub.y;
+    UI.setSubPick(type);
+  },
+
+  toMenu() {
+    if (this.state !== 'gameover' && this.state !== 'victory') return;
+    this.state = 'menu';
+    this.level = null;
+    this.minesArr = [];
+    this.destroyers = [];
+    this.charges = [];
+    this.missiles = [];
+    FX.reset();
+    Input.clear();
+
+    this.sub = new Submarine(CFG.PLAYER.START_X, CFG.PLAYER.START_Y, this.selectedType);
+    Input.mx = this.sub.x;
+    Input.my = this.sub.y;
+
+    UI.showHUD(false);
+    UI.showScreen('menu');
+    UI.setSubPick(this.selectedType);
+  },
+
+  nearestShip(fromX, range) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const ship of this.destroyers) {
+      if (ship.sinking || ship.escaped) continue;
+      const d = Math.abs(ship.x - fromX);
+      if (d <= range && d < bestDist) {
+        bestDist = d;
+        best = ship;
+      }
+    }
+    return best;
   },
 
   loadBest() {
@@ -99,7 +148,7 @@ const Game = {
     this.totalSunk = 0;
     this.best = Math.max(this.best, this.loadBest());
 
-    this.sub = new Submarine(CFG.PLAYER.START_X, CFG.PLAYER.START_Y);
+    this.sub = new Submarine(CFG.PLAYER.START_X, CFG.PLAYER.START_Y, this.selectedType);
     Input.mx = this.sub.x;
     Input.my = this.sub.y;
     Input.clear();
@@ -121,6 +170,7 @@ const Game = {
     this.level = level;
 
     this.minesArr = [];
+    this.missiles = [];
     this.destroyers = [];
     this.charges = [];
 
@@ -130,7 +180,7 @@ const Game = {
     this.sunk = 0;
     this.levelScoreStart = this.score;
 
-    this.mines = CFG.MINE.MAGAZINE;
+    this.ammo = this.weaponCfg().MAGAZINE;
     this.reloadTimer = 0;
     this.fireCd = 0;
 
@@ -151,7 +201,8 @@ const Game = {
     UI.setLives(this.lives);
     UI.updateScore(this.score, this.best);
     UI.setProgress(0, level.roster.length, 0);
-    UI.setMines(this.mines, 1);
+    UI.setAmmoSpec(this.sub.spec);
+    UI.setAmmo(this.ammo, 1);
     UI.showBanner(
       `第 ${index + 1} 关 · ${level.name}`,
       `${level.desc} · 敌舰 ${level.roster.length} 艘`
@@ -210,39 +261,48 @@ const Game = {
     AudioSys.play('charge_splash');
   },
 
-  fireMine() {
+  fireWeapon() {
     if (this.state !== 'playing') return;
-    if (this.fireCd > 0 || this.mines <= 0) return;
+    if (this.fireCd > 0 || this.ammo <= 0) return;
 
-    this.mines--;
-    this.fireCd = CFG.MINE.FIRE_CD;
-    if (this.reloadTimer <= 0 && this.mines < CFG.MINE.MAGAZINE) {
-      this.reloadTimer = CFG.MINE.RELOAD;
+    const W = this.weaponCfg();
+    this.ammo--;
+    this.fireCd = W.FIRE_CD;
+    if (this.reloadTimer <= 0 && this.ammo < W.MAGAZINE) {
+      this.reloadTimer = W.RELOAD;
     }
 
-    this.minesArr.push(new Mine(this.sub.x, this.sub.y - 26));
-    FX.bubble(this.sub.x, this.sub.y - 26, 2, { spread: 4, speed: 22, size: 1.2 });
-    AudioSys.play('mine_launch');
+    if (this.sub.spec.weapon === 'missile') {
+      this.missiles.push(new Missile(this.sub.x, this.sub.y - 26));
+      FX.bubble(this.sub.x, this.sub.y - 26, 2, { spread: 4, speed: 22, size: 1.2 });
+      AudioSys.play('missile_launch');
+    } else {
+      this.minesArr.push(new Mine(this.sub.x, this.sub.y - 26));
+      FX.bubble(this.sub.x, this.sub.y - 26, 2, { spread: 4, speed: 22, size: 1.2 });
+      AudioSys.play('mine_launch');
+    }
   },
 
   updateReload(dt) {
-    if (this.mines >= CFG.MINE.MAGAZINE) {
+    const W = this.weaponCfg();
+    if (this.ammo >= W.MAGAZINE) {
       this.reloadTimer = 0;
       return;
     }
-    if (this.reloadTimer <= 0) this.reloadTimer = CFG.MINE.RELOAD;
+    if (this.reloadTimer <= 0) this.reloadTimer = W.RELOAD;
     this.reloadTimer -= dt;
 
     if (this.reloadTimer <= 0) {
-      this.mines++;
+      this.ammo++;
       AudioSys.play('reload');
-      this.reloadTimer = this.mines < CFG.MINE.MAGAZINE ? CFG.MINE.RELOAD : 0;
+      this.reloadTimer = this.ammo < W.MAGAZINE ? W.RELOAD : 0;
     }
   },
 
   reloadRatio() {
-    if (this.mines >= CFG.MINE.MAGAZINE) return 1;
-    return Utils.clamp(1 - this.reloadTimer / CFG.MINE.RELOAD, 0, 1);
+    const W = this.weaponCfg();
+    if (this.ammo >= W.MAGAZINE) return 1;
+    return Utils.clamp(1 - this.reloadTimer / W.RELOAD, 0, 1);
   },
 
   resolveMineHits() {
@@ -293,15 +353,44 @@ const Game = {
     });
   },
 
+  missileExplode(missile) {
+    if (missile.dead) return;
+    missile.dead = true;
+    missile.y = CFG.SURFACE_Y - 6;
+
+    FX.explosion(missile.x, CFG.SURFACE_Y, CFG.MISSILE.BLAST_RADIUS, {
+      underwater: false,
+      shake: 14
+    });
+    AudioSys.play('missile_blast');
+
+    const hits = this.destroyers.filter((ship) => {
+      if (ship.sinking || ship.escaped) return false;
+      return Utils.circleRect(
+        missile.x, CFG.SURFACE_Y, CFG.MISSILE.BLAST_RADIUS,
+        ship.x, ship.y, ship.len / 2, ship.beam / 2 + 6
+      );
+    });
+
+    hits.forEach((ship, idx) => {
+      if (idx > 0) {
+        this.addScore(CFG.SCORE.EXTRA_HIT);
+        FX.text(ship.x, ship.y - ship.beam - 28, `连锁 +${CFG.SCORE.EXTRA_HIT}`, CFG.COLORS.amberRGB, 15);
+      }
+      this.damageShip(ship, CFG.MISSILE.DAMAGE);
+    });
+  },
+
   damageShip(ship, dmg) {
     if (ship.sinking) return;
 
     const sunkNow = ship.hit(dmg);
-    this.addScore(CFG.SCORE.DAMAGE);
+    const gained = CFG.SCORE.DAMAGE * dmg;
+    this.addScore(gained);
     FX.text(
       ship.x + Utils.rand(-14, 14),
       ship.y - ship.beam - 16,
-      `+${CFG.SCORE.DAMAGE}`,
+      `+${gained}`,
       CFG.COLORS.whiteRGB,
       12
     );
@@ -328,7 +417,7 @@ const Game = {
     if (this.sub.invuln > 0) return;
 
     const d = Utils.dist(this.sub.x, this.sub.y, charge.x, charge.y);
-    if (d <= CFG.CHARGE.BLAST_RADIUS + CFG.PLAYER.RADIUS * 0.4) {
+    if (d <= CFG.CHARGE.BLAST_RADIUS + this.sub.spec.radius * 0.4) {
       this.hitSub();
     }
   },
@@ -359,6 +448,7 @@ const Game = {
     AudioSys.play('mine_blast');
 
     for (const charge of this.charges) charge.cancel();
+    this.missiles = [];
     Input.clear();
   },
 
@@ -388,6 +478,7 @@ const Game = {
       FX.bubble(charge.x, charge.y, 3, { spread: 6 });
     }
     this.charges = [];
+    this.missiles = [];
 
     const isLast = this.levelIndex >= CFG.LEVELS.length - 1;
     if (isLast) {
@@ -475,13 +566,20 @@ const Game = {
 
     if (this.fireCd > 0) this.fireCd -= dt;
     this.updateReload(dt);
-    if (Input.consumeFire()) this.fireMine();
+    if (Input.consumeFire()) this.fireWeapon();
 
     // 水雷
     for (let i = this.minesArr.length - 1; i >= 0; i--) {
       const mine = this.minesArr[i];
       mine.update(dt);
       if (mine.dead) this.minesArr.splice(i, 1);
+    }
+
+    // 潜射导弹
+    for (let i = this.missiles.length - 1; i >= 0; i--) {
+      const missile = this.missiles[i];
+      missile.update(dt, this);
+      if (missile.dead) this.missiles.splice(i, 1);
     }
 
     // 敌舰生成
@@ -521,7 +619,7 @@ const Game = {
     this.resolveMineHits();
 
     UI.setProgress(this.passed, this.level.roster.length, this.sunk);
-    UI.setMines(this.mines, this.reloadRatio());
+    UI.setAmmo(this.ammo, this.reloadRatio());
 
     this.checkLevelClear(dt);
   },
@@ -554,6 +652,7 @@ const Game = {
     if (this.sub) this.sub.draw(ctx, this.time);
 
     for (const ship of this.destroyers) ship.draw(ctx, this.time);
+    for (const missile of this.missiles) missile.draw(ctx, this.time);
 
     World.drawSurface(ctx);
     FX.draw(ctx);
@@ -569,6 +668,38 @@ const Game = {
   },
 
   drawAimGuide(ctx) {
+    if (this.sub.spec.weapon === 'missile') {
+      const target = this.nearestShip(this.sub.x, CFG.MISSILE.LOCK_RANGE);
+      if (!target) return;
+
+      const x = target.x;
+      const y = target.y - target.beam * 0.6;
+      const hw = Math.max(30, target.len * 0.16);
+      const hh = Math.max(20, target.beam * 0.9);
+      const pulse = 0.45 + 0.25 * Math.abs(Math.sin(this.time * 4));
+      const c = 9;
+
+      ctx.save();
+      ctx.strokeStyle = Utils.rgba(CFG.COLORS.amberRGB, pulse);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x - hw, y - hh + c);
+      ctx.lineTo(x - hw, y - hh);
+      ctx.lineTo(x - hw + c, y - hh);
+      ctx.moveTo(x + hw - c, y - hh);
+      ctx.lineTo(x + hw, y - hh);
+      ctx.lineTo(x + hw, y - hh + c);
+      ctx.moveTo(x + hw, y + hh - c);
+      ctx.lineTo(x + hw, y + hh);
+      ctx.lineTo(x + hw - c, y + hh);
+      ctx.moveTo(x - hw + c, y + hh);
+      ctx.lineTo(x - hw, y + hh);
+      ctx.lineTo(x - hw, y + hh - c);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
     const sx = this.sub.x;
     const sy = this.sub.y - 24;
 

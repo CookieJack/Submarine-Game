@@ -8,20 +8,25 @@ const UI = {
   _best: -1,
   _lives: -1,
   _progress: '',
-  _minesKey: '',
+  _ammoKey: '',
+  _weapon: 'mine',
+  _magMax: CFG.MINE.MAGAZINE,
 
   init(game) {
     this.game = game;
 
     const ids = [
       'hud', 'lives', 'level-name', 'progress', 'sunk', 'score', 'best',
-      'btn-pause', 'btn-mute', 'ammo-count', 'ammo-slots', 'reload-fill',
-      'hint-bar', 'banner', 'banner-title', 'banner-sub',
-      'screen-menu', 'menu-best', 'btn-start',
+      'btn-pause', 'btn-mute', 'ammo-label', 'ammo-count', 'ammo-slots',
+      'reload-fill', 'ammo-hint', 'hint-bar',
+      'banner', 'banner-title', 'banner-sub',
+      'screen-menu', 'menu-best', 'btn-start', 'sub-pick',
       'screen-levelclear', 'lc-level', 'lc-score', 'lc-sunk', 'lc-passed',
       'lc-life', 'btn-next',
       'screen-gameover', 'go-level', 'go-score', 'go-sunk', 'btn-restart',
+      'btn-menu-over',
       'screen-victory', 'vc-score', 'vc-best', 'vc-sunk', 'btn-restart-victory',
+      'btn-menu-victory',
       'screen-pause', 'btn-resume', 'btn-restart-pause', 'btn-mute-pause'
     ];
     for (const id of ids) this.el[id] = document.getElementById(id);
@@ -33,12 +38,15 @@ const UI = {
       this.el.lives.appendChild(hull);
     }
 
-    // 水雷槽位
-    for (let i = 0; i < CFG.MINE.MAGAZINE; i++) {
-      const slot = document.createElement('span');
-      slot.className = 'mine-slot';
-      this.el['ammo-slots'].appendChild(slot);
-    }
+    // 潜艇选择卡
+    this.el['sub-pick'].querySelectorAll('.sub-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        AudioSys.init();
+        AudioSys.play('ui');
+        card.blur();
+        this.game.selectSub(card.dataset.sub);
+      });
+    });
 
     const bind = (id, fn) => {
       const el = this.el[id];
@@ -56,6 +64,8 @@ const UI = {
     bind('btn-restart', () => this.game.startNewGame());
     bind('btn-restart-victory', () => this.game.startNewGame());
     bind('btn-restart-pause', () => this.game.startNewGame());
+    bind('btn-menu-over', () => this.game.toMenu());
+    bind('btn-menu-victory', () => this.game.toMenu());
     bind('btn-resume', () => this.game.togglePause());
     bind('btn-pause', () => this.game.togglePause());
     bind('btn-mute', () => this.toggleMute());
@@ -63,8 +73,41 @@ const UI = {
 
     this.syncMute();
     this.setBest(game.best);
+    this.setSubPick(game.selectedType);
+    this.setAmmoSpec(CFG.SUBMARINES[game.selectedType]);
     this.showScreen('menu');
     this.showHUD(false);
+  },
+
+  setSubPick(type) {
+    this.el['sub-pick'].querySelectorAll('.sub-card').forEach((card) => {
+      const active = card.dataset.sub === type;
+      card.classList.toggle('selected', active);
+      card.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  },
+
+  setAmmoSpec(spec) {
+    const cfg = spec.weapon === 'missile' ? CFG.MISSILE : CFG.MINE;
+    this._weapon = spec.weapon;
+    this._magMax = cfg.MAGAZINE;
+
+    this.el['ammo-label'].textContent =
+      spec.weapon === 'missile' ? 'MISSILE RACK' : 'MINE RACK';
+    this.el['ammo-hint'].textContent =
+      spec.weapon === 'missile' ? '左键发射 · 自动锁定最近敌舰' : '左键布雷 · 海面待爆 2 秒';
+    this.el['hint-bar'].textContent =
+      spec.weapon === 'missile'
+        ? '鼠标潜航 · 左键导弹 · P 暂停 · M 静音'
+        : '鼠标潜航 · 左键布雷 · P 暂停 · M 静音';
+
+    this.el['ammo-slots'].innerHTML = '';
+    for (let i = 0; i < cfg.MAGAZINE; i++) {
+      const slot = document.createElement('span');
+      slot.className = 'mine-slot' + (spec.weapon === 'missile' ? ' missile' : '');
+      this.el['ammo-slots'].appendChild(slot);
+    }
+    this._ammoKey = '';
   },
 
   toggleMute() {
@@ -151,12 +194,12 @@ const UI = {
     this.el.sunk.textContent = `击沉 ${sunk}`;
   },
 
-  setMines(count, ratio) {
+  setAmmo(count, ratio) {
     const key = `${count}|${Math.round(Utils.clamp(ratio, 0, 1) * 40)}`;
-    if (this._minesKey === key) return;
-    this._minesKey = key;
+    if (this._ammoKey === key) return;
+    this._ammoKey = key;
 
-    this.el['ammo-count'].textContent = `${count} / ${CFG.MINE.MAGAZINE}`;
+    this.el['ammo-count'].textContent = `${count} / ${this._magMax}`;
     const slots = this.el['ammo-slots'].children;
     for (let i = 0; i < slots.length; i++) {
       slots[i].classList.toggle('on', i < count);

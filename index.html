@@ -39,12 +39,12 @@
 
         <div class="ammo-block">
           <div class="ammo-top">
-            <span class="hud-label">MINE RACK</span>
+            <span class="hud-label" id="ammo-label">MINE RACK</span>
             <span id="ammo-count">5 / 5</span>
           </div>
           <div id="ammo-slots" class="ammo-slots"></div>
           <div class="reload-track"><div id="reload-fill"></div></div>
-          <div class="ammo-hint">左键布雷 · 海面待爆 2 秒</div>
+          <div class="ammo-hint" id="ammo-hint">左键布雷 · 海面待爆 2 秒</div>
         </div>
 
         <div id="hint-bar">鼠标潜航 · 左键布雷 · P 暂停 · M 静音</div>
@@ -72,14 +72,37 @@
             </div>
             <div class="howto-item">
               <div class="howto-num">02</div>
-              <h3>布雷</h3>
-              <p>左键把水雷送上水面。水雷在海面待爆 2 秒，舰体触碰即爆炸。</p>
+              <h3>攻击</h3>
+              <p>柴电潜艇布设水雷，核潜艇发射自动锁定敌舰的潜射导弹。</p>
             </div>
             <div class="howto-item">
               <div class="howto-num">03</div>
               <h3>生存</h3>
               <p>3 条命，5 个海区。顶住全部过境舰队即可完成任务。</p>
             </div>
+          </div>
+
+          <div class="sub-pick-head">
+            <span class="hud-label">SELECT SUBMARINE</span>
+            <span class="sub-pick-note">开局选定 · 本局不可更换</span>
+          </div>
+          <div id="sub-pick" class="sub-pick">
+            <button class="sub-card selected" data-sub="diesel" aria-pressed="true">
+              <span class="sub-role">DIESEL-ELECTRIC</span>
+              <span class="sub-name">柴电潜艇</span>
+              <span class="sub-model">039C 型 · 常规动力</span>
+              <span class="sub-weapon">水雷 × 5</span>
+              <span class="sub-desc">小巧灵活，静音布雷封锁航道</span>
+              <span class="sub-tags"><span>机动 高</span><span>体型 小</span><span>火力 持续</span></span>
+            </button>
+            <button class="sub-card" data-sub="nuclear" aria-pressed="false">
+              <span class="sub-role">NUCLEAR ATTACK</span>
+              <span class="sub-name">核潜艇</span>
+              <span class="sub-model">093A 型 · 核动力</span>
+              <span class="sub-weapon">潜射导弹 × 3</span>
+              <span class="sub-desc">吨位更大，潜射导弹自动锁定最近敌舰</span>
+              <span class="sub-tags"><span>机动 低</span><span>体型 大</span><span>火力 爆发</span></span>
+            </button>
           </div>
 
           <div class="menu-stats">
@@ -91,7 +114,7 @@
           </div>
 
           <button id="btn-start" class="primary-btn">开始任务</button>
-          <div class="menu-foot">鼠标潜航 · 左键布雷 · P 暂停</div>
+          <div class="menu-foot">鼠标潜航 · 左键攻击 · P 暂停</div>
         </div>
       </div>
 
@@ -128,7 +151,10 @@
             <div class="stat-cell"><span>累计击沉</span><b id="go-sunk">0</b></div>
           </div>
 
-          <button id="btn-restart" class="primary-btn">再次下潜</button>
+          <div class="btn-row">
+            <button id="btn-restart" class="primary-btn">再次下潜</button>
+            <button id="btn-menu-over" class="ghost-btn">更换潜艇</button>
+          </div>
           <div class="menu-foot">Enter / 空格 重新开始</div>
         </div>
       </div>
@@ -146,7 +172,10 @@
             <div class="stat-cell"><span>累计击沉</span><b id="vc-sunk">0</b></div>
           </div>
 
-          <button id="btn-restart-victory" class="primary-btn">再来一次</button>
+          <div class="btn-row">
+            <button id="btn-restart-victory" class="primary-btn">再来一次</button>
+            <button id="btn-menu-victory" class="ghost-btn">更换潜艇</button>
+          </div>
           <div class="menu-foot">Enter / 空格 重新开始</div>
         </div>
       </div>

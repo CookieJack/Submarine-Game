@@ -136,6 +136,24 @@ const AudioSys = {
         this.noise(0.18, 0.07, 2600, 0.01, 'highpass');
         break;
 
+      case 'missile_launch':
+        this.tone(120, 60, 0.3, 'sine', 0.18);
+        this.noise(0.16, 0.07, 520);
+        this.tone(380, 900, 0.25, 'triangle', 0.05, 0.02);
+        break;
+
+      case 'missile_breach':
+        this.noise(0.14, 0.06, 3000, 0, 'highpass');
+        this.tone(180, 520, 0.22, 'triangle', 0.08, 0.02);
+        break;
+
+      case 'missile_blast':
+        this.tone(140, 30, 0.5, 'sine', 0.28);
+        this.tone(70, 26, 0.7, 'triangle', 0.2, 0.02);
+        this.noise(0.4, 0.2, 1200);
+        this.noise(0.2, 0.08, 3200, 0.01, 'highpass');
+        break;
+
       case 'charge_splash':
         this.noise(0.12, 0.055, 2600, 0, 'highpass');
         this.tone(330, 140, 0.1, 'sine', 0.035);

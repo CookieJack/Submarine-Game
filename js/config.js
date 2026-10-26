@@ -7,7 +7,7 @@ const CFG = {
   SURFACE_Y: 118,       // 海面高度
   FLOOR_Y: 690,         // 海床高度
 
-  // ============ 玩家潜艇 ============
+  // ============ 玩家潜艇（共用参数） ============
   PLAYER: {
     LIVES: 3,
     MAX_LIVES: 3,
@@ -17,16 +17,38 @@ const CFG = {
     MAX_X: 1236,
     MIN_Y: 250,         // 不许浮出水面
     MAX_Y: 650,         // 不许撞海床
-    MAX_SPEED: 360,     // 最大潜航速度
     ARRIVE_GAIN: 4.5,   // 距目标越近目标速度越低
-    THRUST: 3.2,        // 推进响应率（越小越迟缓）
     CURRENT_X: 12,      // 水平洋流最大流速
     CURRENT_Y: 6,       // 垂直洋流最大流速
     CURRENT_PERIOD_X: 19,
     CURRENT_PERIOD_Y: 13,
-    RADIUS: 18,         // 受击判定半径
-    INVULN: 1.8,        // 受击无敌秒数
-    LENGTH: 116
+    INVULN: 1.8         // 受击无敌秒数
+  },
+
+  // ============ 可选潜艇 ============
+  SUBMARINES: {
+    diesel: {
+      id: 'diesel',
+      name: '柴电潜艇',
+      model: '039C 型',
+      role: 'DIESEL-ELECTRIC',
+      weapon: 'mine',
+      len: 116,
+      speed: 360,
+      thrust: 3.2,
+      radius: 18
+    },
+    nuclear: {
+      id: 'nuclear',
+      name: '核潜艇',
+      model: '093A 型',
+      role: 'NUCLEAR ATTACK',
+      weapon: 'missile',
+      len: 152,
+      speed: 300,
+      thrust: 2.4,
+      radius: 28
+    }
   },
 
   // ============ 水雷 ============
@@ -42,6 +64,20 @@ const CFG = {
     BLAST_RADIUS: 72,
     DAMAGE: 1,
     SINK_TIME: 0.9      // 过期下沉淡出时长
+  },
+
+  // ============ 潜射导弹 ============
+  MISSILE: {
+    MAGAZINE: 3,          // 弹仓上限
+    RELOAD: 5.0,          // 每枚回充秒数
+    FIRE_CD: 0.6,         // 发射间隔
+    RISE_SPEED: 430,      // 水下垂直上浮速度
+    CRUISE_SPEED: 680,    // 出水后巡航速度
+    CRUISE_Y: 56,         // 巡航高度（海面以上）
+    LOCK_RANGE: 640,      // 自动锁定最近敌舰的最大水平距离
+    BLAST_RADIUS: 118,    // 爆炸半径
+    DAMAGE: 2,            // 对舰船伤害
+    LOST_CLIMB_SPEED: 300 // 无目标时爬升离场速度
   },
 
   // ============ 深水炸弹 ============

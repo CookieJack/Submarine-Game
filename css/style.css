@@ -337,6 +337,24 @@ body {
   background: rgba(2, 24, 34, 0.55);
 }
 
+/* 导弹槽：竖向弹体 */
+.mine-slot.missile::after {
+  inset: 4px 7px;
+  transform: none;
+  border-radius: 2px 2px 4px 4px;
+  background: rgba(95, 242, 255, 0.12);
+}
+
+.mine-slot.missile.on {
+  border-color: var(--amber);
+  background: radial-gradient(circle at 38% 32%, #fff2c9 0%, #ffc857 40%, #a86f12 100%);
+  box-shadow: 0 0 10px rgba(255, 200, 87, 0.55);
+}
+
+.mine-slot.missile.on::after {
+  background: rgba(2, 24, 34, 0.55);
+}
+
 .reload-track {
   height: 2px;
   margin: 9px 8px 7px;
@@ -574,6 +592,118 @@ h2 {
   font-size: 11.5px;
   line-height: 1.75;
   color: var(--muted);
+}
+
+/* 开局选艇 */
+.sub-pick-head {
+  margin-top: 20px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sub-pick-note {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(106, 151, 168, 0.75);
+}
+
+.sub-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 9px;
+}
+
+.sub-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 16px 12px;
+  text-align: left;
+  font-family: var(--sans);
+  color: var(--text);
+  cursor: pointer;
+  pointer-events: auto;
+  background: rgba(4, 20, 32, 0.62);
+  border: 1px solid rgba(95, 242, 255, 0.14);
+  border-radius: 4px;
+  transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+}
+
+.sub-card:hover {
+  border-color: var(--cyan-soft);
+  background: rgba(7, 30, 45, 0.8);
+}
+
+.sub-card.selected {
+  border-color: var(--cyan-soft);
+  background: linear-gradient(180deg, rgba(10, 42, 60, 0.9) 0%, rgba(4, 22, 36, 0.9) 100%);
+  box-shadow:
+    0 0 18px rgba(95, 242, 255, 0.14),
+    inset 0 0 20px rgba(95, 242, 255, 0.05);
+}
+
+.sub-card.selected::after {
+  content: "已选";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--amber);
+}
+
+.sub-role {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.24em;
+  color: var(--muted);
+}
+
+.sub-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.sub-model {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--cyan-soft);
+}
+
+.sub-weapon {
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+}
+
+.sub-desc {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.sub-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.sub-tags span {
+  padding: 2px 5px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--cyan-soft);
+  border: 1px solid rgba(95, 242, 255, 0.16);
+  border-radius: 2px;
 }
 
 .menu-stats {

@@ -2,7 +2,9 @@
 
 /* ---------------- 潜艇 ---------------- */
 class Submarine {
-  constructor(x, y) {
+  constructor(x, y, kind = 'diesel') {
+    this.kind = CFG.SUBMARINES[kind] ? kind : 'diesel';
+    this.spec = CFG.SUBMARINES[this.kind];
     this.x = x;
     this.y = y;
     this.tx = x;
@@ -19,6 +21,7 @@ class Submarine {
 
   update(dt) {
     const P = CFG.PLAYER;
+    const S = this.spec;
 
     this.tx = Utils.clamp(Input.mx, P.MIN_X, P.MAX_X);
     this.ty = Utils.clamp(Input.my, P.MIN_Y, P.MAX_Y);
@@ -32,12 +35,12 @@ class Submarine {
     const dx = this.tx - this.x;
     const dy = this.ty - this.y;
     const d = Math.hypot(dx, dy);
-    const desiredSpeed = Math.min(P.MAX_SPEED, d * P.ARRIVE_GAIN);
+    const desiredSpeed = Math.min(S.speed, d * P.ARRIVE_GAIN);
     const desiredVx = d > 0.001 ? (dx / d) * desiredSpeed : 0;
     const desiredVy = d > 0.001 ? (dy / d) * desiredSpeed : 0;
 
     // 推进响应延迟：速度指数趋近期望速度，形成水下惯性与滑行
-    const k = 1 - Math.exp(-P.THRUST * dt);
+    const k = 1 - Math.exp(-S.thrust * dt);
     this.vx += (desiredVx - this.vx) * k;
     this.vy += (desiredVy - this.vy) * k;
 
@@ -73,7 +76,7 @@ class Submarine {
     this.propTimer -= dt;
     if (this.propTimer <= 0) {
       this.propTimer = 0.085;
-      FX.bubble(this.x - this.facing * 64, this.y + 2, 1, { spread: 3, speed: 18, size: 1 });
+      FX.bubble(this.x - this.facing * (S.len * 0.55), this.y + 2, 1, { spread: 3, speed: 18, size: 1 });
     }
   }
 
@@ -83,8 +86,14 @@ class Submarine {
     if (this.invuln > 0) this.invuln = Math.max(0, this.invuln - dt);
   }
 
-  /* 水滴形艇体轮廓，供填充、描边与受击裁剪共用 */
+  /* 艇体轮廓，供填充、描边与受击裁剪共用 */
   hullPath(ctx) {
+    if (this.kind === 'nuclear') this.nuclearHullPath(ctx);
+    else this.dieselHullPath(ctx);
+  }
+
+  /* 柴电潜艇：现有 116 长度水滴形 */
+  dieselHullPath(ctx) {
     ctx.beginPath();
     ctx.moveTo(58, 0);
     ctx.bezierCurveTo(58, -5.5, 50, -10.5, 40, -11.5);
@@ -94,6 +103,20 @@ class Submarine {
     ctx.bezierCurveTo(-47, 10, -38, 14.5, -24, 15.5);
     ctx.bezierCurveTo(-4, 17, 20, 14, 40, 11.5);
     ctx.bezierCurveTo(50, 10.5, 58, 5.5, 58, 0);
+    ctx.closePath();
+  }
+
+  /* 核潜艇：152 长度、中段更饱满的长水滴形 */
+  nuclearHullPath(ctx) {
+    ctx.beginPath();
+    ctx.moveTo(74, 0);
+    ctx.bezierCurveTo(74, -6, 66, -12, 54, -14.5);
+    ctx.bezierCurveTo(32, -18.5, -2, -19.5, -30, -18);
+    ctx.bezierCurveTo(-48, -16.5, -60, -11, -66, -3.5);
+    ctx.bezierCurveTo(-68, -1, -68, 1, -66, 3.5);
+    ctx.bezierCurveTo(-60, 11, -48, 16.5, -30, 18);
+    ctx.bezierCurveTo(-2, 19.5, 32, 18.5, 54, 14.5);
+    ctx.bezierCurveTo(66, 12, 74, 6, 74, 0);
     ctx.closePath();
   }
 
@@ -109,18 +132,52 @@ class Submarine {
     ctx.scale(this.facing, 1);
 
     // 艇艏探照灯（窄锥形，弱化卡通感）
-    const lg = ctx.createLinearGradient(56, 0, 230, 0);
+    const noseX = this.spec.len * 0.48;
+    const lg = ctx.createLinearGradient(noseX, 0, noseX + 174, 0);
     lg.addColorStop(0, 'rgba(140,245,255,0.10)');
     lg.addColorStop(1, 'rgba(140,245,255,0)');
     ctx.fillStyle = lg;
     ctx.beginPath();
-    ctx.moveTo(54, -5);
-    ctx.lineTo(230, -38);
-    ctx.lineTo(230, 38);
-    ctx.lineTo(54, 5);
+    ctx.moveTo(noseX - 2, -5);
+    ctx.lineTo(noseX + 174, -38);
+    ctx.lineTo(noseX + 174, 38);
+    ctx.lineTo(noseX - 2, 5);
     ctx.closePath();
     ctx.fill();
 
+    if (this.kind === 'nuclear') this.drawNuclearBody(ctx, time);
+    else this.drawDieselBody(ctx, time);
+
+    // 受击红闪（裁剪在艇体内）
+    if (this.hitFlash > 0) {
+      ctx.save();
+      this.hullPath(ctx);
+      ctx.clip();
+      ctx.fillStyle = Utils.rgba(CFG.COLORS.dangerRGB, this.hitFlash * 0.65);
+      ctx.fillRect(-90, -24, 180, 48);
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    // 无敌护盾环
+    if (this.invuln > 0) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(time * 1.8);
+      ctx.setLineDash([7, 8]);
+      ctx.strokeStyle = 'rgba(95,242,255,0.5)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.spec.radius + 20, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  /* 柴电潜艇艇体细节（保持原有视觉） */
+  drawDieselBody(ctx, time) {
     // 七叶螺旋桨
     ctx.save();
     ctx.translate(-57, 0);
@@ -312,32 +369,221 @@ class Submarine {
     ctx.beginPath();
     ctx.arc(27, -23, 1.3, 0, Math.PI * 2);
     ctx.fill();
+  }
 
-    // 受击红闪（裁剪在艇体内）
-    if (this.hitFlash > 0) {
+  /* 核潜艇（093A 参考）艇体细节 */
+  drawNuclearBody(ctx, time) {
+    // 七叶螺旋桨
+    ctx.save();
+    ctx.translate(-74, 0);
+    ctx.scale(1.22, 1.22);
+    ctx.rotate(time * 11);
+    ctx.strokeStyle = 'rgba(170,246,255,0.5)';
+    ctx.lineWidth = 1.1;
+    for (let i = 0; i < 7; i++) {
       ctx.save();
-      this.hullPath(ctx);
-      ctx.clip();
-      ctx.fillStyle = Utils.rgba(CFG.COLORS.dangerRGB, this.hitFlash * 0.65);
-      ctx.fillRect(-60, -20, 120, 40);
+      ctx.rotate((Math.PI * 2 * i) / 7);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(2.2, -5.8, 6.8, -10.6);
+      ctx.quadraticCurveTo(7.4, -6.4, 3.2, 0);
+      ctx.closePath();
+      ctx.stroke();
       ctx.restore();
     }
-
+    ctx.fillStyle = 'rgba(6,14,20,0.95)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
 
-    // 无敌护盾环
-    if (this.invuln > 0) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(time * 1.8);
-      ctx.setLineDash([7, 8]);
-      ctx.strokeStyle = 'rgba(95,242,255,0.5)';
-      ctx.lineWidth = 1.4;
+    // 尾轴
+    ctx.strokeStyle = 'rgba(95,242,255,0.25)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(-60, 0);
+    ctx.lineTo(-72, 0);
+    ctx.stroke();
+
+    // X 形尾舵
+    ctx.fillStyle = CFG.COLORS.hullDark;
+    ctx.strokeStyle = 'rgba(95,242,255,0.28)';
+    ctx.lineWidth = 1;
+    for (const s of [-1, 1]) {
       ctx.beginPath();
-      ctx.arc(0, 0, 38, 0, Math.PI * 2);
+      ctx.moveTo(-42, s * 12);
+      ctx.lineTo(-62, s * 27);
+      ctx.lineTo(-54, s * 29);
+      ctx.lineTo(-36, s * 14);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
+    }
+
+    // 长水滴形艇体
+    ctx.shadowColor = 'rgba(95,242,255,0.38)';
+    ctx.shadowBlur = 14;
+    const hull = ctx.createLinearGradient(0, -20, 0, 20);
+    hull.addColorStop(0, '#4a6a76');
+    hull.addColorStop(0.34, '#244a58');
+    hull.addColorStop(0.68, '#11293a');
+    hull.addColorStop(1, '#06121a');
+    ctx.fillStyle = hull;
+    this.hullPath(ctx);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.strokeStyle = 'rgba(95,242,255,0.68)';
+    ctx.lineWidth = 1.1;
+    this.hullPath(ctx);
+    ctx.stroke();
+
+    // 艇艏声呐罩浅色渐变
+    ctx.save();
+    this.hullPath(ctx);
+    ctx.clip();
+    const nose = ctx.createLinearGradient(74, 0, 46, 0);
+    nose.addColorStop(0, 'rgba(150,240,255,0.13)');
+    nose.addColorStop(1, 'rgba(150,240,255,0)');
+    ctx.fillStyle = nose;
+    ctx.fillRect(46, -22, 30, 44);
+    ctx.restore();
+
+    // 顶部高光
+    ctx.strokeStyle = 'rgba(210,252,255,0.36)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(52, -14.5);
+    ctx.quadraticCurveTo(10, -19.5, -40, -17.5);
+    ctx.stroke();
+
+    // 消声瓦分缝
+    ctx.strokeStyle = 'rgba(0,0,0,0.24)';
+    ctx.lineWidth = 0.8;
+    for (const sx of [-40, -27, -14, -1, 12, 25, 38]) {
+      ctx.beginPath();
+      ctx.moveTo(sx, -18);
+      ctx.quadraticCurveTo(sx + 1.6, 0, sx, 17.5);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-46, 9);
+    ctx.quadraticCurveTo(0, 12.5, 44, 9);
+    ctx.stroke();
+
+    // 侧舷声呐阵列
+    ctx.fillStyle = 'rgba(3,12,18,0.6)';
+    Utils.roundRect(ctx, -40, 6, 66, 4.6, 2.2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(95,242,255,0.18)';
+    ctx.lineWidth = 0.7;
+    for (let i = 1; i < 11; i++) {
+      const sx = -40 + i * 6;
+      ctx.beginPath();
+      ctx.moveTo(sx, 6.4);
+      ctx.lineTo(sx, 10.2);
+      ctx.stroke();
+    }
+
+    // 鱼雷发射管舱门（4 个）
+    for (const sy of [-8.5, -3.5, 3.5, 8.5]) {
+      ctx.fillStyle = 'rgba(3,12,18,0.55)';
+      Utils.roundRect(ctx, 46, sy - 1.3, 8, 2.6, 1.2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150,245,255,0.28)';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+
+    // 艏部声呐罩分缝
+    ctx.strokeStyle = 'rgba(150,245,255,0.25)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(58, -13.2);
+    ctx.quadraticCurveTo(53, 0, 58, 13.2);
+    ctx.stroke();
+
+    // 背部导弹发射舱盖（3 个）
+    for (let i = 0; i < 3; i++) {
+      const hx = -40 + i * 11;
+      ctx.fillStyle = 'rgba(4,14,20,0.75)';
+      Utils.roundRect(ctx, hx, -18.8, 7, 2.8, 1);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,200,87,0.38)';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+    }
+
+    // 围壳
+    const sail = ctx.createLinearGradient(0, -42, 0, -15);
+    sail.addColorStop(0, '#3d6270');
+    sail.addColorStop(1, '#0a2230');
+    ctx.fillStyle = sail;
+    ctx.strokeStyle = 'rgba(95,242,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(14, -15);
+    ctx.lineTo(19, -39);
+    ctx.quadraticCurveTo(20, -42, 24, -42);
+    ctx.lineTo(42, -42);
+    ctx.quadraticCurveTo(46, -42, 46.5, -38);
+    ctx.lineTo(49, -15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 围壳舵（fairwater planes）
+    ctx.fillStyle = 'rgba(9,30,42,0.95)';
+    ctx.strokeStyle = 'rgba(95,242,255,0.36)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(18, -26.5);
+    ctx.lineTo(62, -24.8);
+    ctx.lineTo(62, -22.4);
+    ctx.lineTo(19, -23.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 桅杆
+    ctx.strokeStyle = 'rgba(160,248,255,0.6)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(24, -42);
+    ctx.lineTo(24, -54);
+    ctx.lineTo(29, -54);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(35, -42);
+    ctx.lineTo(35, -50);
+    ctx.lineTo(32, -50);
+    ctx.stroke();
+
+    // 围壳驾驶窗
+    ctx.fillStyle = 'rgba(4,14,20,0.9)';
+    ctx.strokeStyle = 'rgba(120,242,255,0.3)';
+    ctx.lineWidth = 0.6;
+    for (const wx of [23, 32]) {
+      Utils.roundRect(ctx, wx, -39.5, 6, 3, 1);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // 围壳信号灯
+    const sig = 0.25 + 0.35 * Math.abs(Math.sin(time * 2.4));
+    ctx.fillStyle = `rgba(255,200,87,${sig})`;
+    ctx.beginPath();
+    ctx.arc(44, -29, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 舷号（仅正朝向时绘制，避免镜像文字）
+    if (this.facing === 1) {
+      ctx.font = '8px monospace';
+      ctx.fillStyle = 'rgba(210,245,255,0.22)';
+      ctx.textAlign = 'center';
+      ctx.fillText('093A', -4, 2);
+      ctx.textAlign = 'left';
     }
   }
 }
@@ -468,6 +714,178 @@ class Mine {
     ctx.beginPath();
     ctx.arc(this.x, y, 2.6, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+/* ---------------- 潜射导弹 ---------------- */
+class Missile {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.state = 'rising';        // rising → cruise → lost
+    this.target = null;
+    this.dead = false;
+    this.t = 0;
+    this.angle = -Math.PI / 2;
+    this.trailTimer = 0;
+    this.sparkTimer = 0;
+  }
+
+  update(dt, game) {
+    const M = CFG.MISSILE;
+    this.t += dt;
+
+    if (this.state === 'rising') {
+      this.y -= M.RISE_SPEED * dt;
+      this.angle = -Math.PI / 2;
+
+      this.trailTimer -= dt;
+      if (this.trailTimer <= 0) {
+        this.trailTimer = 0.06;
+        FX.bubble(this.x, this.y + 12, 1, { spread: 3, speed: 24, size: 1.2 });
+      }
+
+      if (this.y <= CFG.SURFACE_Y) {
+        this.y = CFG.SURFACE_Y;
+        this.state = 'cruise';
+        this.target = game.nearestShip(this.x, M.LOCK_RANGE);
+        FX.splash(this.x, CFG.SURFACE_Y);
+        FX.ring(this.x, CFG.SURFACE_Y, {
+          maxR: 44, life: 0.5, width: 1.8, rgb: CFG.COLORS.cyanRGB
+        });
+        AudioSys.play('missile_breach');
+
+        if (this.target) {
+          this.angle = this.target.x >= this.x ? 0 : Math.PI;
+        } else {
+          this.state = 'lost';
+          this.angle = -Math.PI / 2;
+        }
+      }
+      return;
+    }
+
+    if (this.state === 'lost') {
+      this.y -= M.LOST_CLIMB_SPEED * dt;
+      this.angle = -Math.PI / 2;
+      if (this.y < -60) this.dead = true;
+      return;
+    }
+
+    // 巡航：目标失效则重新锁定
+    if (
+      !this.target ||
+      this.target.sinking ||
+      this.target.escaped ||
+      !game.destroyers.includes(this.target)
+    ) {
+      this.target = game.nearestShip(this.x, M.LOCK_RANGE);
+      if (!this.target) {
+        this.state = 'lost';
+        this.angle = -Math.PI / 2;
+        return;
+      }
+    }
+
+    const dx = this.target.x - this.x;
+    const dir = dx >= 0 ? 1 : -1;
+    const step = M.CRUISE_SPEED * dt;
+    if (Math.abs(dx) <= step) this.x = this.target.x;
+    else this.x += dir * step;
+
+    const near = Math.abs(this.target.x - this.x) <= 96;
+    this.y = Utils.damp(this.y, near ? CFG.SURFACE_Y - 4 : M.CRUISE_Y, near ? 9 : 5, dt);
+
+    // 最短路径转向，末段略微俯冲
+    let targetAngle = near
+      ? (dir > 0 ? 0.28 : Math.PI + 0.28)
+      : (dir > 0 ? 0 : Math.PI);
+    let diff = targetAngle - this.angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    this.angle += diff * (1 - Math.exp(-8 * dt));
+
+    // 尾迹
+    this.trailTimer -= dt;
+    if (this.trailTimer <= 0) {
+      this.trailTimer = 0.045;
+      FX.smoke(this.x - dir * 9, this.y + 2, 1);
+    }
+    this.sparkTimer -= dt;
+    if (this.sparkTimer <= 0) {
+      this.sparkTimer = 0.08;
+      FX.spark(this.x - dir * 9, this.y + 1, 2, { rgb: CFG.COLORS.amberRGB, speed: 50 });
+    }
+
+    if (Math.abs(this.target.x - this.x) <= 24) {
+      this.x = this.target.x;
+      game.missileExplode(this);
+    }
+  }
+
+  draw(ctx, time) {
+    const flicker = 1 + Math.sin(time * 38 + this.t * 7) * 0.22;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+
+    // 尾焰
+    const flame = ctx.createLinearGradient(-9, 0, -9 - 20 * flicker, 0);
+    flame.addColorStop(0, 'rgba(255,240,180,0.9)');
+    flame.addColorStop(0.4, 'rgba(255,160,60,0.7)');
+    flame.addColorStop(1, 'rgba(255,80,40,0)');
+    ctx.fillStyle = flame;
+    ctx.beginPath();
+    ctx.moveTo(-8.5, -3);
+    ctx.lineTo(-8.5 - 20 * flicker, 0);
+    ctx.lineTo(-8.5, 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // 弹体光晕
+    ctx.shadowColor = 'rgba(255,190,90,0.55)';
+    ctx.shadowBlur = 12;
+    const body = ctx.createLinearGradient(0, -3.4, 0, 3.4);
+    body.addColorStop(0, '#f4f8f9');
+    body.addColorStop(0.5, '#a9bbc3');
+    body.addColorStop(1, '#4a5f69');
+    ctx.fillStyle = body;
+    Utils.roundRect(ctx, -9, -3.4, 18, 6.8, 2.4);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 弹头
+    ctx.fillStyle = '#1f3038';
+    ctx.beginPath();
+    ctx.moveTo(8.5, -3.4);
+    ctx.lineTo(14, 0);
+    ctx.lineTo(8.5, 3.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // 尾翼
+    ctx.fillStyle = '#16262e';
+    ctx.beginPath();
+    ctx.moveTo(-7, -3.2);
+    ctx.lineTo(-13, -6.6);
+    ctx.lineTo(-8, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-7, 3.2);
+    ctx.lineTo(-13, 6.6);
+    ctx.lineTo(-8, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // 青色轮廓
+    ctx.strokeStyle = 'rgba(95,242,255,0.55)';
+    ctx.lineWidth = 0.8;
+    Utils.roundRect(ctx, -9, -3.4, 18, 6.8, 2.4);
+    ctx.stroke();
 
     ctx.restore();
   }
